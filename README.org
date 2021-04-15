@@ -1,0 +1,17 @@
+#+title: Tetrodropper - A Tetris Clone
+#+author: Lorenzo Mella
+
+
+* Tetrodropper
+
+A simple terminal-based Tetris clone. Depends on ncurses.
+
+[[file:screenshots/game.png]]
+
+* What is missing?
+
+- Instantaneous drop.
+- Integrating height-related drops into the point system.
+- Updating the game speed as the score increases.
+- A score ranking visualiser.
+- I/O features to save the rankings.

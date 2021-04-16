@@ -2,6 +2,7 @@
 #define H_TETRODROPPER_H
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -13,9 +14,10 @@
 #define Min(a, b)	((a) < (b) ? (a) : (b))
 #define Max(a, b)	((a) > (b) ? (a) : (b))
 
-#define BOARD_HEIGHT	16
-#define BOARD_WIDTH	10
-
+#define BOARD_HEIGHT		16
+#define BOARD_WIDTH		10
+#define PREVIEW_WIN_SIDE	7 /* Side length of the preview window */
+#define MAX_TYPES		7 /* Number of distinct tetromino types */
 
 #define Die(__die_condition)						\
   do {									\
@@ -68,7 +70,7 @@ struct GameBoard {
   int		spawn_point_y;
   int		spawn_point_x;
   int		floor_y;
-  int **	is_filled;
+  bool **	is_filled;
 };
 
 
@@ -95,16 +97,16 @@ struct Tetromino {
       .min_y = -1, .center_y = 0, .max_y = 2,				\
       .min_x = 0, .center_x = 0, .max_x = 0,				\
       .type = I_TYPE, .num_states = 2, .rotation_state = 0 };
-#define L_TETROMINO_TEMPLATE						\
+#define J_TETROMINO_TEMPLATE						\
   (struct Tetromino){ .square = { {-1, 0}, {0, 0}, {1, 0}, {1, -1} },	\
       .min_y = -1, .center_y = 0, .max_y = 1,				\
       .min_x = -1, .center_x = 0, .max_x = 0,				\
-      .type = L_TYPE, .num_states = 4, .rotation_state = 0 };
-#define J_TETROMINO_TEMPLATE						\
+      .type = J_TYPE, .num_states = 4, .rotation_state = 0 };
+#define L_TETROMINO_TEMPLATE						\
   (struct Tetromino){ .square = { {-1, 0}, {0, 0}, {1, 0}, {1, 1} },	\
       .min_y = -1, .center_y = 0, .max_y = 1,				\
       .min_x = 0, .center_x = 0, .max_x = 1,				\
-      .type = J_TYPE, .num_states = 4, .rotation_state = 0 };
+      .type = L_TYPE, .num_states = 4, .rotation_state = 0 };
 #define Z_TETROMINO_TEMPLATE						\
   (struct Tetromino){ .square = { {0, -1}, {0, 0}, {1, 0}, {1, 1} },	\
       .min_y = 0, .center_y = 0, .max_y = 1,				\
@@ -153,9 +155,11 @@ void free_gameboard(struct GameBoard *board);
 
 enum CollisionType point_collision(struct Point p, struct GameBoard *board);
 
-void rotate_tetromino(struct Tetromino *t, struct GameBoard *board, WINDOW *win);
+enum CollisionType check_collision(struct Tetromino *t, struct GameBoard *board);
 
 void reposition_tetromino(struct Tetromino *t, int new_y, int new_x, WINDOW *from, WINDOW *to);
+
+enum CollisionType rotate_tetromino(struct Tetromino *t, struct GameBoard *board, WINDOW *win);
 
 enum CollisionType move_tetromino(struct Tetromino *t, struct GameBoard *board, int dy, int dx,
 				  WINDOW *win);
@@ -170,5 +174,8 @@ void draw_tetromino(WINDOW *win, struct Tetromino * const t, int offset_y, int o
 void delete_tetromino(WINDOW *win, struct Tetromino * const t, int offset_y, int offset_x);
 
 void draw_board(WINDOW *win, int top_left_y, int top_left_x, int height, int width);
+
+void draw_block_drop(WINDOW *win, int row);
+
 
 #endif	/* H_TETRODROPPER_H */

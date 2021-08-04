@@ -120,21 +120,10 @@ void free_gameboard(struct GameBoard *board)
 }
 
 
-struct Point rotate_point_90(struct Point p, int origin_y, int origin_x, bool counter_clockwise)
-{
-  /* 
-   * The formula is essentially a rotation matrix on centered coordinates:
-   *   new_pos = center + rot_matrix * (old_pos - center)
-   */
-  struct Point new_p;
 
-  int rotation_sign = 2 * (int)counter_clockwise - 1;
-  
-  new_p.y = origin_y + rotation_sign * (p.x - origin_x);
-  new_p.x = origin_x - rotation_sign * (p.y - origin_y);
-
-  return new_p;
-}
+/*
+ * Game Mechanics
+ */
 
 
 void recompute_bounding_box(struct Tetromino *t)
@@ -143,40 +132,6 @@ void recompute_bounding_box(struct Tetromino *t)
   t->max_y = Max(Max(t->square[0].y, t->square[1].y), Max(t->square[2].y, t->square[3].y));
   t->min_x = Min(Min(t->square[0].x, t->square[1].x), Min(t->square[2].x, t->square[3].x));
   t->max_x = Max(Max(t->square[0].x, t->square[1].x), Max(t->square[2].x, t->square[3].x));
-}
-
-
-enum CollisionType rotate_tetromino(struct Tetromino *t, struct GameBoard *board, WINDOW *win)
-{
-  /* The 'O' tetromino doesn't rotate */
-  if (t->num_states == 1) return NO_COLLISION;
-
-  /* Rotation is clockwise only for already rotated 2-state tetrominoes */
-  int counter_clockwise = t->num_states != 2 || t->rotation_state != 1;
-
-  struct Tetromino new_t = *t;	/* Verify collisions non-destructively */
-  
-  for (int i = 0; i < 4; ++i) {
-    new_t.square[i] = rotate_point_90(t->square[i], t->center_y, t->center_x, counter_clockwise);
-  }
-
-  enum CollisionType c = check_collision(&new_t, board);
-
-  if (c == NO_COLLISION) {
-    
-    if (win != NULL) delete_tetromino(win, t, 0, 0);
-    
-    /* Update state, extremal values copy on the original data structure */
-    new_t.rotation_state = (new_t.rotation_state + 1) % new_t.num_states;
-
-    recompute_bounding_box(&new_t);
-
-    *t = new_t;
-
-    if (win != NULL) draw_tetromino(win, t, 0, 0);
-  }
-  
-  return c;
 }
 
 
@@ -206,7 +161,7 @@ enum CollisionType point_collision(struct Point p, struct GameBoard *board)
 
 enum CollisionType check_collision(struct Tetromino *t, struct GameBoard *board)
 {
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < MAX_BLOCKS; ++i) {
 
     enum CollisionType c = point_collision(t->square[i], board);
 
@@ -217,6 +172,60 @@ enum CollisionType check_collision(struct Tetromino *t, struct GameBoard *board)
 }
 
 
+
+struct Point rotate_point_90(struct Point p, int origin_y, int origin_x, bool counter_clockwise)
+{
+  /* 
+   * The formula is essentially a rotation matrix on centered coordinates:
+   *   new_pos = center + rot_matrix * (old_pos - center)
+   */
+  struct Point new_p;
+
+  int rotation_sign = 2 * (int)counter_clockwise - 1;
+  
+  new_p.y = origin_y + rotation_sign * (p.x - origin_x);
+  new_p.x = origin_x - rotation_sign * (p.y - origin_y);
+
+  return new_p;
+}
+
+
+
+enum CollisionType rotate_tetromino(struct Tetromino *t, struct GameBoard *board, WINDOW *win)
+{
+  /* The 'O' tetromino doesn't rotate */
+  if (t->num_states == 1) return NO_COLLISION;
+
+  /* Rotation is clockwise only for already rotated 2-state tetrominoes */
+  int counter_clockwise = t->num_states != 2 || t->rotation_state != 1;
+
+  struct Tetromino new_t = *t;	/* Verify collisions non-destructively */
+  
+  for (int i = 0; i < MAX_BLOCKS; ++i) {
+    new_t.square[i] = rotate_point_90(t->square[i], t->center_y, t->center_x, counter_clockwise);
+  }
+
+  enum CollisionType c = check_collision(&new_t, board);
+
+  if (c == NO_COLLISION) {
+    
+    if (win != NULL) delete_tetromino(win, t, 0, 0);
+    
+    /* Update state, extremal values copy on the original data structure */
+    new_t.rotation_state = (new_t.rotation_state + 1) % new_t.num_states;
+
+    recompute_bounding_box(&new_t);
+
+    *t = new_t;
+
+    if (win != NULL) draw_tetromino(win, t, 0, 0);
+  }
+  
+  return c;
+}
+
+
+
 enum CollisionType move_tetromino(struct Tetromino *t, struct GameBoard *board, int dy, int dx,
 				  WINDOW *win)
 {
@@ -224,7 +233,7 @@ enum CollisionType move_tetromino(struct Tetromino *t, struct GameBoard *board, 
   struct Tetromino new_t = *t;
 
   /* Move it */
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < MAX_BLOCKS; ++i) {
     new_t.square[i].y += dy;
     new_t.square[i].x += dx;
   }
@@ -252,7 +261,7 @@ void reposition_tetromino(struct Tetromino *t, int y, int x, WINDOW *from, WINDO
 {
   if (from != NULL) delete_tetromino(from, t, 0, 0);
 
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < MAX_BLOCKS; ++i) {
     t->square[i].y += y - t->center_y;
     t->square[i].x += x - t->center_x;
   }
@@ -269,7 +278,7 @@ void reposition_tetromino(struct Tetromino *t, int y, int x, WINDOW *from, WINDO
 
 void record_dead_blocks(struct Tetromino *t, struct GameBoard *board)
 {
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < MAX_BLOCKS; ++i) {
     board->is_filled[t->square[i].y][t->square[i].x] = true;
   }
 }
@@ -303,7 +312,7 @@ int remove_and_count_full_rows(struct GameBoard *board, int bottom_row, int top_
       board->is_filled[0] = calloc(board->width, sizeof(board->is_filled[0][0]));
 
       /* Visualize the effect on screen */
-      if (win) draw_block_drop(win, row);
+      if (win) animate_drop(win, row);
       
       deleted += 1;
       
@@ -330,6 +339,25 @@ long score_from_lines(int num_lines)
 
 
 
+double speed_from_score(long score)
+{
+  return INITIAL_SPEED + (score / SCORE_MODULUS) * SPEED_INCREMENT;
+}
+
+
+
+double get_real_time(void)
+{
+  struct timespec tic;
+  clock_gettime(CLOCK_REALTIME, &tic);
+
+  /* Time in seconds, with fractional part up to (at most) nanoseconds */
+  return tic.tv_sec + 1e-9 * tic.tv_nsec;
+}
+
+
+
+
 
 /* 
  * Graphics
@@ -339,7 +367,7 @@ long score_from_lines(int num_lines)
 void draw_tetromino(WINDOW *win, struct Tetromino * const t, int offset_y, int offset_x)
 {
   wcolor_set(win, t->type, NULL);
-  for (int i = 0; i < 4; ++i) { 
+  for (int i = 0; i < MAX_BLOCKS; ++i) { 
     mvwaddch(win, offset_y + t->square[i].y, offset_x + t->square[i].x, ACS_DIAMOND);
   }  
 }
@@ -348,7 +376,7 @@ void draw_tetromino(WINDOW *win, struct Tetromino * const t, int offset_y, int o
 void delete_tetromino(WINDOW *win, struct Tetromino * const t, int offset_y, int offset_x)
 {
   wcolor_set(win, 0, NULL);
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < MAX_BLOCKS; ++i) {
     mvwaddch(win, offset_y + t->square[i].y, offset_x + t->square[i].x, ' ');
   }
 }
@@ -369,7 +397,7 @@ void draw_board(WINDOW *win, int top_left_y, int top_left_x, int height, int wid
 }
 
 
-void draw_block_drop(WINDOW *win, int row)
+void animate_drop(WINDOW *win, int row)
 {
   wmove(win, row, 0);
   wdeleteln(win);
@@ -390,11 +418,25 @@ void draw_updated_stats(WINDOW *win, long score, double speed)
   mvwaddstr(win, height / 3, (width - strlen(score_str)) / 2, score_str);
 
   char speed_str[11];
-  snprintf(speed_str, 11, "%.1gx", speed);
+  snprintf(speed_str, 11, "%.2gx", speed);
 
   mvwaddstr(win, 2 * height / 3 - 1, (width - strlen(score_str)) / 2, "SPEED:");
   mvwaddstr(win, 2 * height / 3, (width - strlen(score_str)) / 2, speed_str);
   
+}
+
+
+WINDOW *draw_message_popup(char *msg)
+{
+  int screen_height, screen_width;
+  getmaxyx(stdscr, screen_height, screen_width);
+  
+  WINDOW *win = newwin(5, strlen(msg) + 4, screen_height / 2, (screen_width - strlen(msg)) / 2);
+  box(win, ACS_VLINE, ACS_HLINE);
+
+  mvwaddnstr(win, 2, 2, msg, strlen(msg));
+  
+  return win;
 }
 
 
@@ -406,42 +448,129 @@ void draw_updated_stats(WINDOW *win, long score, double speed)
 enum GameState title_screen(void)
 {
   clear();
-  
-  box(stdscr, ACS_VLINE, ACS_HLINE);
+    
   int screen_height, screen_width;
   getmaxyx(stdscr, screen_height, screen_width);
 
-  box(stdscr, ACS_VLINE, ACS_HLINE);
-
-  char *welcome_string = "TETRODROPPER - Press [RET] to play or [Q] to quit.";
-  mvprintw(screen_height / 2, (screen_width - strlen(welcome_string)) / 2, welcome_string);  
+  for (int i = 0; i < TITLE_HEIGHT; ++i)
+    mvprintw(screen_height / 3 + i, (screen_width - TITLE_WIDTH) / 2, title_string[i]);
   
+  char *welcome_string = "Press [RET] to play, [S] to display the rankings, or [Q] to quit.";
+  mvprintw(screen_height * 2 / 3, (screen_width - strlen(welcome_string)) / 2, welcome_string);
+
+  box(stdscr, ACS_VLINE, ACS_HLINE);
+    
   refresh();
 
   while (true) {
     
     chtype ch = getch();
 
-    if (ch == Ctrl('J')) return STATE_GAME;
-    else if (ch == 's') return STATE_SCORES;
-    else if (ch == 'q') return STATE_QUIT;
+    switch (ch) {
+    case Ctrl('J'):
+      return STATE_GAME;
+    case 's':
+      return STATE_SCORES;
+    case 'q':
+      return STATE_QUIT;
+    }
   }
 }
 
 
-
-double get_real_time(void)
+enum GameState score_screen(struct Ranking rankings[11])
 {
-  struct timespec tic;
-  clock_gettime(CLOCK_REALTIME, &tic);
+  clear();
+  
+  int screen_height, screen_width;
+  getmaxyx(stdscr, screen_height, screen_width);
 
-  /* Time in seconds, with fractional part up to (at most) nanoseconds */
-  return tic.tv_sec + 1e-9 * tic.tv_nsec;
+  char *score_str = "TOP-10 RANKINGS";
+  mvprintw(screen_height / 4, (screen_width - strlen(score_str)) / 2, score_str);
+  
+  for (int i = 0; i < 10; ++i) {
+    mvprintw(screen_height / 4 + 2 + i, (screen_width - 15) / 2, "%s  %010ld",
+	     rankings[i].name, rankings[i].score);
+  }
+
+  char *msg_string = "Press [T] to go back to the Title Screen or [Q] to quit.";
+  mvprintw(screen_height / 4 + 13, (screen_width - strlen(msg_string)) / 2, msg_string);
+
+  
+  box(stdscr, ACS_VLINE, ACS_HLINE);
+    
+  refresh();
+
+  while (true) {
+    
+    chtype ch = getch();
+
+    switch (ch) {
+    case 't':
+      return STATE_TITLE;
+    case 'q':
+      return STATE_QUIT;
+    }
+  }
 }
 
 
+enum GameState manage_gameover(void)
+{
+  char msg[] = "Game Over. Press [T] to go to the title screen or [Q] to quit.";
 
-enum GameState game_screen(void)
+  WINDOW *popup_win = draw_message_popup(msg);
+
+  wrefresh(popup_win);
+  
+  enum GameState next_state;
+
+  while (true) {
+    chtype ch = getch();
+    if (ch == 't' || ch == 'T') {
+      next_state = STATE_TITLE;
+      break;
+    } else if (ch == 'q' || ch == 'Q') {
+      next_state = STATE_QUIT;
+      break;
+    }
+  }
+  
+  delwin(popup_win);
+  
+  return next_state;
+}
+
+
+/* Comparison function for qsort */
+bool ranking_ge(struct Ranking *a, struct Ranking *b)
+{
+  return a->score > b->score;
+}
+
+
+char *insert_ranking_name(void)
+{
+  return "ABC";
+}
+
+
+void record_ranking(struct Ranking rankings[11], char *new_name, long new_score)
+{
+  /* Add new ranking in the temporary slot */
+  strncpy(rankings[10].name, new_name, 4);
+  rankings[10].score = new_score;
+
+  /* Sort all the slots */
+  qsort(rankings, 11, sizeof(*rankings), (int (*)(const void *, const void *))ranking_ge);
+
+  /* Reset the temporary slot */
+  strncpy(rankings[10].name, "???", 4);
+  rankings[10].score = 0L;
+}
+
+
+enum GameState game_screen(struct Ranking rankings[11])
 {
   /* Prepare the game board */
   struct GameBoard *board = new_gameboard(BOARD_HEIGHT, BOARD_WIDTH);
@@ -455,7 +584,7 @@ enum GameState game_screen(void)
   
   WINDOW *field_win = newwin(field_height, field_width, 0, 0);
 
-  WINDOW *stats_win = newwin(screen_height, screen_width - field_width, 0, field_width);
+  WINDOW *side_win = newwin(screen_height, screen_width - field_width, 0, field_width);
   
   int board_origin_y = (field_height - board->height) / 2;
   int board_origin_x = (field_width - board->width) / 2;
@@ -469,64 +598,74 @@ enum GameState game_screen(void)
   /* Add the basic graphical decorations */
   draw_board(field_win, board_origin_y, board_origin_x, board->height, board->width);
   box(field_win, ACS_VLINE, ACS_HLINE);
-  box(stats_win, ACS_VLINE, ACS_HLINE);
+  box(side_win, ACS_VLINE, ACS_HLINE);
   box(preview_win, ACS_VLINE, ACS_HLINE);
 
   /* Game loop */
-
-  double speed = 2.0;
-  double dT = 1. / speed;  
-  long score = 0;
   
-  double threshold = dT + get_real_time();
-  
-  struct Tetromino *current_piece = new_tetromino(random_type(), 1, board->width / 2, board_win);
-  struct Tetromino *preview_piece = new_tetromino(random_type(), PREVIEW_WIN_SIDE / 2,
+  struct Tetromino *current_piece = new_tetromino(random_type(), SPAWN_HEIGHT, SPAWN_WIDTH,
+						  board_win);
+  struct Tetromino *preview_piece = new_tetromino(random_type(), PREVIEW_WIN_SIDE / 2 - 1,
 						  PREVIEW_WIN_SIDE / 2, preview_win);
-  
-  bool gameover = false;
 
+  long score = 0;
+
+  double threshold = 1. / INITIAL_SPEED + get_real_time();
+
+  bool gameover = false;
+  
   while (!gameover) {
 
-    draw_updated_stats(stats_win, score, speed);
-    
+    double speed = speed_from_score(score);
+
+    draw_updated_stats(side_win, score, speed);
+
+    /* Refresh all screen assets */
     wnoutrefresh(field_win);
-    wnoutrefresh(stats_win);
+    wnoutrefresh(side_win);
     wnoutrefresh(preview_win);
     wnoutrefresh(board_win);
     doupdate();
 
-    /* Compute current time in seconds */
+    /* Timed event management */
+    if (get_real_time() >= threshold) {
 
-    /* Check for timed event */
-    if (get_real_time() > threshold) {
-
-      threshold += dT;
-
+      threshold += 1. / speed;
+      
       enum CollisionType collision = move_tetromino(current_piece, board, +1, 0, board_win);
 
       if (collision != NO_COLLISION) {
 
+	/* Manage transformation of current piece into dead blocks, row deletion and score */
 	record_dead_blocks(current_piece, board);
 
 	int num_deleted = remove_and_count_full_rows(board, current_piece->max_y,
 						     current_piece->min_y, board_win);
 
 	score += score_from_lines(num_deleted);
-	
+
 	free(current_piece);
 
+	/* Move the tetromino object from the preview window to the board */
 	current_piece = preview_piece;
+	
+	reposition_tetromino(current_piece, SPAWN_HEIGHT, SPAWN_WIDTH,
+			     preview_win, board_win);
 
-	reposition_tetromino(current_piece, 1, board->width / 2, preview_win, board_win);
-
-	preview_piece = new_tetromino(random_type(), PREVIEW_WIN_SIDE / 2,
+	preview_piece = new_tetromino(random_type(), PREVIEW_WIN_SIDE / 2 - 1,
 				      PREVIEW_WIN_SIDE / 2, preview_win);
-      }
-      
-      continue;
-    }
 
+	/* GAMEOVER CONDITION: the piece already collides with a dead piece as soon as it spawns */
+        if (check_collision(current_piece, board) != NO_COLLISION) {
+	  wrefresh(preview_win);
+	  wrefresh(board_win);
+          gameover = true;
+        }
+
+        continue;    /* Skip keyboard input during timed event management */
+      }
+    }
+    
     /* Check for user event */
     chtype ch;
     if ((ch = getch()) != ERR) {
@@ -540,10 +679,17 @@ enum GameState game_screen(void)
       } else if (ch == 'd' || ch == KEY_RIGHT) {
 	move_tetromino(current_piece, board, 0, +1, board_win);
       } else {
-        gameover = ch == Ctrl('Q'); /* Forced quit */
+	gameover = ch == Ctrl('C'); /* Force-quit */
       }
     }
   }
+
+
+  /* Gameover operations */
+  char *name = insert_ranking_name();
+  record_ranking(rankings, name, score);
+  
+  enum GameState next_state = manage_gameover();
 
   /* Cleanup */
   free(current_piece);
@@ -552,20 +698,28 @@ enum GameState game_screen(void)
 
   delwin(board_win);
   delwin(preview_win);
-  delwin(stats_win);
+  delwin(side_win);
   delwin(field_win);
   
-  return STATE_QUIT;
+  return next_state;
 }
 
+
+
+void query_save_scores(void)
+{
+  /* NOT IMPLEMENTED */
+}
 
 
 int main(void)
 {
   initialize();
 
+  struct Ranking rankings[11] = INIT_RANKINGS;
+  
   enum GameState next_state = STATE_TITLE;  
-
+  
   while (true) {
 
     if (next_state == STATE_TITLE) {
@@ -574,15 +728,16 @@ int main(void)
       
     } else if (next_state == STATE_GAME) {
       
-      next_state = game_screen();
+      next_state = game_screen(rankings);
       
     } else if (next_state == STATE_SCORES) {
       
-      break;			/* TEMPORARY */
+      next_state = score_screen(rankings);
       
-    } else {
+    } else {			/* Quitting */
       
-      break; 
+      query_save_scores();
+      break;
     }
   }
 }

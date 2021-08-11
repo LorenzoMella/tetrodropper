@@ -1,6 +1,7 @@
 #include "tetrodropper.h"
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -426,12 +427,15 @@ void draw_updated_stats(WINDOW *win, long score, double speed)
 }
 
 
-WINDOW *draw_message_popup(char *msg)
+WINDOW *draw_message_popup(int col_offt, char *msg)
 {
   int screen_height, screen_width;
   getmaxyx(stdscr, screen_height, screen_width);
   
-  WINDOW *win = newwin(5, strlen(msg) + 4, screen_height / 2, (screen_width - strlen(msg)) / 2);
+  WINDOW *win = newwin(5, strlen(msg) + 4,
+		       (screen_height) / 2 - 2 + col_offt,
+		       (screen_width - strlen(msg)) / 2);
+  
   box(win, ACS_VLINE, ACS_HLINE);
 
   mvwaddnstr(win, 2, 2, msg, strlen(msg));
@@ -460,35 +464,39 @@ enum GameState title_screen(void)
 
   box(stdscr, ACS_VLINE, ACS_HLINE);
     
-  refresh();
+  wrefresh(stdscr);
 
+  enum GameState next_state;
+  
   while (true) {
-    
     chtype ch = getch();
-
-    switch (ch) {
-    case Ctrl('J'):
-      return STATE_GAME;
-    case 's':
-      return STATE_SCORES;
-    case 'q':
-      return STATE_QUIT;
+    if (ch == KEY_RETURN) {
+      next_state = STATE_GAME;
+      break;
+    } else if (toupper(ch) == 'S') {
+      next_state = STATE_SCORES;
+      break;
+    } else if (toupper(ch) == 'Q') {
+      next_state = STATE_QUIT;
+      break;
     }
   }
+
+  return next_state;
 }
 
 
-enum GameState score_screen(struct Ranking rankings[11])
+enum GameState score_screen(struct Ranking rankings[MAX_RANKINGS + 1])
 {
   clear();
   
   int screen_height, screen_width;
   getmaxyx(stdscr, screen_height, screen_width);
-
+  
   char *score_str = "TOP-10 RANKINGS";
   mvprintw(screen_height / 4, (screen_width - strlen(score_str)) / 2, score_str);
   
-  for (int i = 0; i < 10; ++i) {
+  for (int i = 0; i < MAX_RANKINGS; ++i) {
     mvprintw(screen_height / 4 + 2 + i, (screen_width - 15) / 2, "%s  %010ld",
 	     rankings[i].name, rankings[i].score);
   }
@@ -501,17 +509,20 @@ enum GameState score_screen(struct Ranking rankings[11])
     
   refresh();
 
+  enum GameState next_state;
+  
   while (true) {
-    
     chtype ch = getch();
-
-    switch (ch) {
-    case 't':
-      return STATE_TITLE;
-    case 'q':
-      return STATE_QUIT;
+    if (toupper(ch) == 'T') {
+      next_state = STATE_TITLE;
+      break;
+    } else if (toupper(ch) == 'Q') {
+      next_state = STATE_QUIT;
+      break;
     }
   }
+
+  return next_state;
 }
 
 
@@ -519,7 +530,7 @@ enum GameState manage_gameover(void)
 {
   char msg[] = "Game Over. Press [T] to go to the title screen or [Q] to quit.";
 
-  WINDOW *popup_win = draw_message_popup(msg);
+  WINDOW *popup_win = draw_message_popup(0, msg);
 
   wrefresh(popup_win);
   
@@ -527,10 +538,10 @@ enum GameState manage_gameover(void)
 
   while (true) {
     chtype ch = getch();
-    if (ch == 't' || ch == 'T') {
+    if (toupper(ch) == 'T') {
       next_state = STATE_TITLE;
       break;
-    } else if (ch == 'q' || ch == 'Q') {
+    } else if (toupper(ch) == 'Q') {
       next_state = STATE_QUIT;
       break;
     }
@@ -545,32 +556,109 @@ enum GameState manage_gameover(void)
 /* Comparison function for qsort */
 bool ranking_ge(struct Ranking *a, struct Ranking *b)
 {
-  return a->score > b->score;
+  return a->score < b->score;
 }
 
 
-char *insert_ranking_name(void)
+void insert_ranking_name(char *name)
 {
-  return "ABC";
+  /* Display message and create box window to insert the initials */
+  int screen_height, screen_width;
+  getmaxyx(stdscr, screen_height, screen_width);
+
+  WINDOW *msg_win = draw_message_popup(-5, "You made it into the Top-10! "
+				       "Insert your initials. Press [RET] to end.");
+  
+  WINDOW *insert_box = newwin(7, 11, (screen_height - 7) * 2 / 3, (screen_width - 11) / 2);
+
+  box(insert_box, ACS_VLINE, ACS_HLINE);
+
+  /* Add arrow graphics to suggest UI */
+  mvwaddch(insert_box, 2, 4, ACS_UARROW);
+  mvwaddch(insert_box, 2, 5, ACS_UARROW);
+  mvwaddch(insert_box, 2, 6, ACS_UARROW);
+  mvwaddch(insert_box, 3, 3, ACS_LARROW);
+  mvwaddch(insert_box, 3, 7, ACS_RARROW);
+  mvwaddch(insert_box, 4, 4, ACS_DARROW);
+  mvwaddch(insert_box, 4, 5, ACS_DARROW);
+  mvwaddch(insert_box, 4, 6, ACS_DARROW);
+  
+  /* Name insertion */
+  char inserted_name[NAME_BUF_LEN] = "AAA";
+
+  curs_set(1);		       /* Display native cursor for clarity */
+
+  int i = 0;	      /* Position currently edited in inserted_name */
+
+  wmove(insert_box, 3, 4);
+  waddstr(insert_box, inserted_name);
+  
+  while (true) {
+    wnoutrefresh(msg_win);
+    wrefresh(insert_box);
+
+    wmove(insert_box, 3, i + 4);
+    
+    chtype ch;
+
+    if ((ch = getch()) != ERR) {
+
+      if (ch == KEY_UP) {
+	
+	inserted_name[i] = NextChar(inserted_name[i]);
+	waddch(insert_box, inserted_name[i]);
+	
+      } else if (ch == KEY_LEFT) {
+	
+	i = (i + (NAME_BUF_LEN - 1) - 1) % (NAME_BUF_LEN - 1);
+	
+      } else if (ch == KEY_DOWN) {
+	
+	inserted_name[i] = PrevChar(inserted_name[i]);
+	waddch(insert_box, inserted_name[i]);
+	
+      } else if (ch == KEY_RIGHT) {
+	
+        i = (i + 1) % (NAME_BUF_LEN - 1);
+	
+      } else if (ch == KEY_RETURN) { /* Return Key */
+	
+        break;
+      }
+    }
+  }
+  
+  curs_set(0);			/* Hide native cursor again */
+  
+  delwin(insert_box);
+  delwin(msg_win);
+  
+  strncpy(name, inserted_name, 4);
 }
 
 
-void record_ranking(struct Ranking rankings[11], char *new_name, long new_score)
+bool top_score(struct Ranking rankings[MAX_RANKINGS + 1], long new_score)
+{
+  return new_score > rankings[MAX_RANKINGS - 1].score;
+}
+
+
+void record_ranking(struct Ranking rankings[MAX_RANKINGS + 1], char *new_name, long new_score)
 {
   /* Add new ranking in the temporary slot */
-  strncpy(rankings[10].name, new_name, 4);
-  rankings[10].score = new_score;
+  strncpy(rankings[MAX_RANKINGS].name, new_name, NAME_BUF_LEN);
+  rankings[MAX_RANKINGS].score = new_score;
 
   /* Sort all the slots */
-  qsort(rankings, 11, sizeof(*rankings), (int (*)(const void *, const void *))ranking_ge);
+  qsort(rankings, MAX_RANKINGS + 1, sizeof(*rankings), ranking_ge);
 
   /* Reset the temporary slot */
-  strncpy(rankings[10].name, "???", 4);
-  rankings[10].score = 0L;
+  strncpy(rankings[MAX_RANKINGS].name, "???", NAME_BUF_LEN);
+  rankings[MAX_RANKINGS].score = 0L;
 }
 
 
-enum GameState game_screen(struct Ranking rankings[11])
+enum GameState game_screen(struct Ranking rankings[MAX_RANKINGS + 1])
 {
   /* Prepare the game board */
   struct GameBoard *board = new_gameboard(BOARD_HEIGHT, BOARD_WIDTH);
@@ -670,13 +758,13 @@ enum GameState game_screen(struct Ranking rankings[11])
     chtype ch;
     if ((ch = getch()) != ERR) {
 
-      if (ch == 'w' || ch == KEY_UP) {
+      if (toupper(ch) == 'W' || ch == KEY_UP) {
 	rotate_tetromino(current_piece, board, board_win);
-      } else if (ch == 'a' || ch == KEY_LEFT) {
+      } else if (toupper(ch) == 'A' || ch == KEY_LEFT) {
 	move_tetromino(current_piece, board, 0, -1, board_win);
-      } else if (ch == 's' || ch == KEY_DOWN) {
+      } else if (toupper(ch) == 'S' || ch == KEY_DOWN) {
 	move_tetromino(current_piece, board, +1, 0, board_win);
-      } else if (ch == 'd' || ch == KEY_RIGHT) {
+      } else if (toupper(ch) == 'D' || ch == KEY_RIGHT) {
 	move_tetromino(current_piece, board, 0, +1, board_win);
       } else {
 	gameover = ch == Ctrl('C'); /* Force-quit */
@@ -686,9 +774,13 @@ enum GameState game_screen(struct Ranking rankings[11])
 
 
   /* Gameover operations */
-  char *name = insert_ranking_name();
-  record_ranking(rankings, name, score);
-  
+
+  if (top_score(rankings, score)) {
+    char player_name[NAME_BUF_LEN];
+    insert_ranking_name(player_name);
+    record_ranking(rankings, player_name, score);
+  }
+
   enum GameState next_state = manage_gameover();
 
   /* Cleanup */
@@ -716,7 +808,7 @@ int main(void)
 {
   initialize();
 
-  struct Ranking rankings[11] = INIT_RANKINGS;
+  struct Ranking rankings[MAX_RANKINGS + 1] = INIT_RANKINGS;
   
   enum GameState next_state = STATE_TITLE;  
   

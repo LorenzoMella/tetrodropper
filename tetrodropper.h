@@ -13,6 +13,10 @@
 #define Max(a, b)	((a) > (b) ? (a) : (b))
 
 #define Ctrl(ch)	((ch) - 'A' + 1)
+#define KEY_RETURN	(Ctrl('J'))
+
+#define NextChar(ch)	'A' + (ch - 'A' + 1) % 26; /* Next capital letter, wrapping to 'A' after 'Z' */
+#define PrevChar(ch)	'A' + (ch - 'A' + 25) % 26 /* Previous capital letter, wrapping */
 
 #define BOARD_HEIGHT		16
 #define BOARD_WIDTH		10
@@ -23,6 +27,8 @@
 #define MAX_BLOCKS		4 /* Number of blocks in a tetromino (as the name implies) */
 #define TITLE_HEIGHT		4
 #define TITLE_WIDTH		73
+#define MAX_RANKINGS		10
+#define NAME_BUF_LEN		4 /* Number of bytes in the ranking initials string */
 
 #ifdef NDEBUG
 
@@ -257,7 +263,7 @@ void animate_drop(WINDOW *win, int row);
 
 void draw_updated_stats(WINDOW *win, long score, double speed);
 
-WINDOW *draw_message_popup(char *msg);
+WINDOW *draw_message_popup(int col_offt, char *msg);
 
 
 /*
@@ -265,14 +271,30 @@ WINDOW *draw_message_popup(char *msg);
  */
   
 
+/**
+ * The title screen and its controls to access all other phases
+ */
 enum GameState title_screen(void);
 
-enum GameState score_screen(struct Ranking rankings[11]);
+/**
+ * Visualise the top-10 rankings
+ */
+enum GameState score_screen(struct Ranking rankings[]);
 
+
+/**
+ * The main phase, where the gameplay takes place
+ */
+enum GameState game_screen(struct Ranking rankings[]);
+
+/**
+ * Gameover popup that appears after losing the game
+ */
 enum GameState manage_gameover(void);
 
-enum GameState game_screen(struct Ranking rankings[11]);
-
+/**
+ * NOT IMPLEMENTED: popup that asks whether to keep a savefile with the rankings
+ */
 void query_save_scores(void);
 
 

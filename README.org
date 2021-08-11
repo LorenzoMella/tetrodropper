@@ -4,19 +4,23 @@
 
 * Tetrodropper
 
-A simple terminal Tetris clone, based on =ncurses=.
+  A simple terminal Tetris clone, based on =ncurses=.
 
-[[file:pics/game.png]]
+  [[file:pics/title-screen.png]]
+
+  [[file:pics/rankings.png]]
+
+  [[file:pics/gameplay.png]]
 
 ** Building instructions
 
-Make.
-Compiles under Linux with =glibc= and =ncurses=.
+   - Make.
+
+   - Compiles under Linux with =glibc= and =ncurses=.
 
 ** Missing features
 
-- Catching the window-resize signal. For now, use an =80x25= terminal window at a minimum.
-- Instantaneous drop.
-- Integrating height-related drops into the point system.
-- A score ranking visualiser.
-- I/O features to save the rankings.
+   - Catching the window-resize signal. For now, use an =80x25= terminal window at a minimum.
+   - Instantaneous drop.
+   - Integrating height-related drops into the point system.
+   - I/O features to save the rankings.
